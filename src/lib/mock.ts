@@ -108,16 +108,98 @@ const REACTIONS: Record<number, { reaction: string; inner: string }[]> = {
   ],
 };
 
-function rewrites(message: string, hits: Rule[]): CheckResult["rewrites"] {
-  let fixed = message;
-  for (const r of hits) fixed = fixed.replaceAll(r.phrase, r.suggestion);
+type Replacement = [RegExp, string];
+
+// 先頭の挨拶と絵文字は各トーンで付け直すので一旦外す。
+const STRIP: Replacement[] = [
+  [/^(お疲れ様です|お疲れさまです|おつかれさまです|お世話になっております)[！!。、]?\s*/, ""],
+  [/[\p{Extended_Pictographic}\u{FE0F}]/gu, ""],
+];
+
+// 口語・くだけた表現 → ビジネス用語。上から順に適用するので、長い表現を先に置く。
+const BUSINESS: Replacement[] = [
+  [/まだでしょうか/g, "その後の進捗はいかがでしょうか"],
+  [/至急対応/g, "恐れ入りますが、お早めのご対応を"],
+  [/至急/g, "お早めに"],
+  [/正直、?/g, "率直に申し上げますと、"],
+  [/反映されていないように見えます/g, "一部反映されていない箇所があるように見受けられます"],
+  [/前にも言いましたが、?/g, "念のため改めてお伝えいたしますと、"],
+  [/なんで/g, "どのような理由で"],
+  [/間に合わなかったので/g, "間に合わず、誠に申し訳ございません。つきましては、"],
+  [/リスケで/g, "日程の再調整を"],
+  [/リスケ/g, "日程の再調整"],
+  [/特にないです/g, "特にございません"],
+  [/ないです/g, "ございません"],
+  [/すみません|すいません|ごめんなさい|ごめん/g, "申し訳ございません"],
+  [/了解です|了解しました|わかりました|分かりました/g, "承知いたしました"],
+  [/ちょっと見ました/g, "一通り拝見しました"],
+  [/見ました/g, "拝見しました"],
+  [/聞きました/g, "伺いました"],
+  [/言いました/g, "申し上げました"],
+  [/もらえると助かります/g, "いただけますと幸いです"],
+  [/もらえますか|もらえませんか/g, "いただけますでしょうか"],
+  [/お願いできますか/g, "お願いできますでしょうか"],
+  [/ください/g, "いただけますでしょうか"],
+  [/お願いします/g, "お願いいたします"],
+  [/確認します/g, "確認いたします"],
+  [/送ります/g, "お送りいたします"],
+  [/休みます/g, "休暇をいただきます"],
+  [/どうですか/g, "いかがでしょうか"],
+  [/いいですか/g, "よろしいでしょうか"],
+  [/できません/g, "いたしかねます"],
+  [/今日/g, "本日"],
+  [/あとで/g, "後ほど"],
+  [/さっき/g, "先ほど"],
+  [/ちょっと/g, "少々"],
+  [/けど/g, "が"],
+  [/[！!？?]/g, "。"],
+];
+
+// やわらか:敬語にしすぎず、責める感じだけ消す。
+const SOFT: Replacement[] = [
+  [/まだでしょうか/g, "その後いかがでしょうか"],
+  [/至急対応/g, "もし可能でしたら早めに対応"],
+  [/至急/g, "できれば早めに"],
+  [/正直、?/g, "個人的な印象なのですが、"],
+  [/反映されていないように見えます/g, "反映されていない部分があるかも…と思いました"],
+  [/前にも言いましたが、?/g, "念のためですが、"],
+  [/なんで/g, "どうして"],
+  [/特にないです/g, "急ぎのものはありません"],
+  [/リスケ/g, "日程の変更"],
+  [/もらえますか[？?]?/g, "お願いできると助かります。"],
+  [/けど/g, "が"],
+];
+
+// 簡潔:前置き・クッションを削る。
+const TRIM: Replacement[] = [
+  [/本日の定例ですが、?/g, "本日の定例は、"],
+  [/(率直に申し上げますと|恐れ入りますが|念のため改めてお伝えいたしますと)、?/g, ""],
+  [/誠に申し訳ございません。つきましては、/g, "申し訳ございません。"],
+];
+
+const apply = (text: string, rules: Replacement[]) => rules.reduce((t, [re, to]) => t.replace(re, to), text);
+
+function rewrites(message: string, recipient: Recipient): CheckResult["rewrites"] {
+  const body = apply(message.trim(), STRIP).trim();
+  const business = apply(body, BUSINESS);
+  const external = FORMAL_RECIPIENTS.includes(recipient);
+  const opener = external ? "いつもお世話になっております。" : "お疲れ様です。";
+  const closer = /お願い(いたします|申し上げます)。?$/.test(business)
+    ? ""
+    : external
+      ? "\n何卒よろしくお願い申し上げます。"
+      : "\nよろしくお願いいたします。";
+
   return [
-    { tone: "やわらか", text: `お疲れさまです。お忙しいところすみません。\n${fixed}\nご無理のない範囲でご確認いただけますと嬉しいです。` },
-    { tone: "ビジネス標準", text: `お世話になっております。\n${fixed}\nよろしくお願いいたします。` },
-    { tone: "簡潔", text: fixed },
+    {
+      tone: "やわらか",
+      text: `お疲れさまです。お忙しいところすみません。\n${apply(body, SOFT)}\nご無理のない範囲で大丈夫ですので、よろしくお願いします。`,
+    },
+    { tone: "ビジネス標準", text: `${opener}\n${business}${closer}` },
+    { tone: "簡潔", text: apply(business, TRIM) },
     {
       tone: "土下座",
-      text: `このたびは誠に、誠に申し訳ございません。\n${fixed}\n本来であれば直接お伺いし、地面に額をこすりつけてお詫びすべきところ、文面でのご連絡となりますことを重ねてお詫び申し上げます。`,
+      text: `このたびは誠に、誠に申し訳ございません。\n${business}\n本来であれば直接お伺いし、地面に額をこすりつけてお詫びすべきところ、文面でのご連絡となりますことを重ねてお詫び申し上げます。`,
     },
   ];
 }
@@ -147,6 +229,6 @@ export function mockResult(req: CheckRequest): CheckResult {
       ignore_rate: Math.min(100, score * 15 + Math.floor(Math.random() * 20)),
     })),
     risky_phrases: hits.map(({ phrase, reason, suggestion }) => ({ phrase, reason, suggestion })),
-    rewrites: rewrites(req.message, hits),
+    rewrites: rewrites(req.message, req.recipient),
   };
 }
