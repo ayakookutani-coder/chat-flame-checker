@@ -160,7 +160,7 @@ export default function Home() {
           disabled={loading || !message.trim()}
           className="mt-6 w-full rounded-xl bg-orange-600 py-3 text-base font-bold text-white shadow hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? "🔥 燃え具合を測定中…" : result ? "🔄 もう一度チェック(反応する人が変わります)" : "🔥 炎上度をチェック"}
+          {loading ? "🔥 燃え具合を測定中…" : result ? "🔄 もう一度チェック" : "🔥 炎上度をチェック"}
         </button>
         {error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       </section>
