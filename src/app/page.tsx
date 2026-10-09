@@ -85,71 +85,74 @@ export default function Home() {
       </header>
 
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <label className="mb-2 block text-sm font-semibold" htmlFor="message">
-          送りたい文章
-        </label>
-        <textarea
-          id="message"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={6}
-          placeholder="例:先日の件、まだでしょうか。至急対応お願いします。"
-          className="w-full rounded-lg border border-stone-300 p-3 text-[15px] leading-relaxed outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
-        />
-        <div className="mt-2 flex flex-wrap gap-2">
-          <span className="text-xs text-stone-500">例文:</span>
-          {EXAMPLES.map((ex) => (
-            <button
-              key={ex}
-              type="button"
-              onClick={() => setMessage(ex)}
-              className="max-w-[16rem] truncate rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700 hover:bg-stone-200"
-            >
-              {ex}
-            </button>
-          ))}
-        </div>
+        {/* 測定中は入力・送り先・媒体をまとめて触れないようにする */}
+        <fieldset disabled={loading} className="transition-opacity disabled:pointer-events-none disabled:opacity-50">
+          <label className="mb-2 block text-sm font-semibold" htmlFor="message">
+            送りたい文章
+          </label>
+          <textarea
+            id="message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={6}
+            placeholder="例:先日の件、まだでしょうか。至急対応お願いします。"
+            className="w-full rounded-lg border border-stone-300 p-3 text-[15px] leading-relaxed outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+          />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span className="text-xs text-stone-500">例文:</span>
+            {EXAMPLES.map((ex) => (
+              <button
+                key={ex}
+                type="button"
+                onClick={() => setMessage(ex)}
+                className="max-w-[16rem] truncate rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700 hover:bg-stone-200"
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto]">
-          <fieldset>
-            <legend className="mb-2 text-sm font-semibold">送り先</legend>
-            <div className="flex flex-wrap gap-2">
-              {RECIPIENTS.map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRecipient(r)}
-                  className={`rounded-full border px-3 py-1.5 text-sm ${
-                    recipient === r
-                      ? "border-orange-600 bg-orange-600 text-white"
-                      : "border-stone-300 bg-white text-stone-700 hover:border-orange-400"
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-          <fieldset>
-            <legend className="mb-2 text-sm font-semibold">媒体</legend>
-            <div className="flex gap-2">
-              {CHANNELS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setChannel(c)}
-                  className={`rounded-full border px-3 py-1.5 text-sm ${
-                    channel === c
-                      ? "border-stone-800 bg-stone-800 text-white"
-                      : "border-stone-300 bg-white text-stone-700 hover:border-stone-500"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-        </div>
+          <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto]">
+            <fieldset>
+              <legend className="mb-2 text-sm font-semibold">送り先</legend>
+              <div className="flex flex-wrap gap-2">
+                {RECIPIENTS.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setRecipient(r)}
+                    className={`rounded-full border px-3 py-1.5 text-sm ${
+                      recipient === r
+                        ? "border-orange-600 bg-orange-600 text-white"
+                        : "border-stone-300 bg-white text-stone-700 hover:border-orange-400"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="mb-2 text-sm font-semibold">媒体</legend>
+              <div className="flex gap-2">
+                {CHANNELS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setChannel(c)}
+                    className={`rounded-full border px-3 py-1.5 text-sm ${
+                      channel === c
+                        ? "border-stone-800 bg-stone-800 text-white"
+                        : "border-stone-300 bg-white text-stone-700 hover:border-stone-500"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          </div>
+        </fieldset>
 
         <button
           type="button"
