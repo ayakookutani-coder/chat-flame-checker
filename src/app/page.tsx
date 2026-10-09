@@ -44,20 +44,21 @@ export default function Home() {
   const [tone, setTone] = useState<(typeof TONES)[number]>("ビジネス標準");
   const [copied, setCopied] = useState(false);
 
-  async function check() {
+  async function check(text = message) {
+    setMessage(text);
     setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, recipient, channel }),
+        body: JSON.stringify({ message: text, recipient, channel }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "エラーが発生しました");
       setResult(data.result);
       setMock(data.mock);
-      setCheckedText(message);
+      setCheckedText(text);
     } catch (e) {
       setError(e instanceof Error ? e.message : "エラーが発生しました");
     } finally {
@@ -152,7 +153,7 @@ export default function Home() {
 
         <button
           type="button"
-          onClick={check}
+          onClick={() => check()}
           disabled={loading || !message.trim()}
           className="mt-6 w-full rounded-xl bg-orange-600 py-3 text-base font-bold text-white shadow hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -263,8 +264,12 @@ export default function Home() {
               </button>
               <button
                 type="button"
-                onClick={() => rewrite && setMessage(rewrite.text)}
-                disabled={!rewrite}
+                onClick={() => {
+                  if (!rewrite) return;
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                  check(rewrite.text);
+                }}
+                disabled={!rewrite || loading}
                 className="rounded-lg border border-stone-300 px-4 py-2 text-sm hover:bg-stone-100 disabled:opacity-50"
               >
                 この案で再チェック
