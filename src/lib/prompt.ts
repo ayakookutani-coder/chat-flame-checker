@@ -36,7 +36,7 @@ const PERSONAS: Record<Recipient, string[]> = {
   ],
 };
 
-function pickPersonas(recipient: Recipient, count = 3): string[] {
+export function pickPersonas(recipient: Recipient, count = 3): string[] {
   const pool = [...PERSONAS[recipient]];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
