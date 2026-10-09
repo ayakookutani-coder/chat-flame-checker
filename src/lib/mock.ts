@@ -104,6 +104,23 @@ const RULES: Rule[] = [
   },
 ];
 
+// 乱暴な言い方・暴言・スラング。単語の完全一致では拾いきれないので正規表現で形ごと検出する。
+// どの送り先でも重い。ビジネス文では言い換えようがないものは書き直し案から削除する。
+type RudeRule = { pattern: RegExp; reason: string; suggestion: string; base: number };
+
+const RUDE: RudeRule[] = [
+  { pattern: /おせ[ーぇえ]+(よ|な)?|遅すぎ(る|ん)/, reason: "相手を責める乱暴な言い方", suggestion: "恐れ入りますが、お急ぎいただけますと幸いです", base: 5 },
+  { pattern: /ふざけ(ん|る)な|いい加減にして/, reason: "怒りをぶつけている。関係が壊れるレベル", suggestion: "状況について一度ご説明いただけますでしょうか", base: 5 },
+  { pattern: /何回(言えば|言った)/, reason: "相手を責め、見下している印象", suggestion: "念のため改めてお伝えいたします", base: 3 },
+  { pattern: /使えな(い|ねー)|ありえ(ない|ねー)|あり得ない|うざ(い|っ)?|バカ|ばか|アホ|クソ|くそ/, reason: "暴言。ビジネスの場では一切使えない", suggestion: "(削除する)", base: 5 },
+  { pattern: /ちゃんとして/, reason: "上から目線で、相手の仕事を否定している", suggestion: "ご確認のほどよろしくお願いいたします", base: 3 },
+  { pattern: /は[？?]/, reason: "威圧的で、喧嘩腰に読める", suggestion: "(削除する)", base: 3 },
+  { pattern: /じゃね[ーえ]|だろ(?![うか])|[ぁ-ん]+ー+[よなわ]|ねーよ/, reason: "タメ口・スラング。くだけすぎていて失礼", suggestion: "です・ます調に直す", base: 2 },
+  { pattern: /(マジ|まじ)で?/, reason: "くだけすぎた言い方", suggestion: "大変 / 本当に", base: 1 },
+];
+
+const RUDE_WEIGHT: Record<Recipient, number> = { 顧客: 2, 社外パートナー: 2, 上司: 2, 他部署: 1, 後輩: 0 };
+
 // くだけた表現は社外だと減点。後輩・社内なら問題なし。
 const CASUAL = /[🙏😂😭👍!！]|w$|笑|してよ|だよ|じゃん|でしょ(?!う)/;
 const FORMAL_RECIPIENTS: Recipient[] = ["顧客", "社外パートナー"];
@@ -148,6 +165,16 @@ const STRIP: Replacement[] = [
 
 // 口語・くだけた表現 → ビジネス用語。上から順に適用するので、長い表現を先に置く。
 const BUSINESS: Replacement[] = [
+  [/おせ[ーぇえ]+(よ|な)?[。！!]*|遅すぎ(る|ん)[^。]*[。！!]*/g, "恐れ入りますが、お急ぎいただけますと幸いです。"],
+  [/(ふざけ(ん|る)な|いい加減にして(ください|よ)?)[。！!]*/g, "状況について一度ご説明いただけますでしょうか。"],
+  [/何回(言えば|言った)[^。？?]*[。？?]?/g, "念のため改めてお伝えいたします。"],
+  [/[^。]*(使えな(い|ねー)|ありえ(ない|ねー)|あり得ない|うざ(い|っ)?|バカ|ばか|アホ|クソ|くそ)[^。]*[。！!]*/g, ""],
+  [/ちゃんとして[^。]*[。！!]*/g, "ご確認のほどよろしくお願いいたします。"],
+  [/は[？?]/g, ""],
+  [/(マジ|まじ)で?/g, "大変"],
+  [/すげ[ーぇえ]+(な|ね|よ)?[、。！!]*/g, "素晴らしいですね。"],
+  [/終わった(の|ん)/g, "完了したのでしょうか"],
+  [/じゃん/g, "ではないでしょうか"],
   [/まだでしょうか/g, "その後の進捗はいかがでしょうか"],
   [/まだ(なの|ですか)?[？?！!。]+/g, "その後の進捗はいかがでしょうか。"],
   [/(早く|はやく)して(よ|ね|ください)?[。！!]*/g, "お手数ですが、お早めにご対応いただけますでしょうか。"],
@@ -196,6 +223,12 @@ const BUSINESS: Replacement[] = [
 
 // やわらか:敬語にしすぎず、責める感じだけ消す。
 const SOFT: Replacement[] = [
+  [/おせ[ーぇえ]+(よ|な)?[。！!]*|遅すぎ(る|ん)[^。]*[。！!]*/g, "急がせてしまって申し訳ないのですが、早めだと助かります。"],
+  [/(ふざけ(ん|る)な|いい加減にして(ください|よ)?)[。！!]*/g, "一度状況を教えてもらえると助かります。"],
+  [/何回(言えば|言った)[^。？?]*[。？?]?/g, "念のため、もう一度お伝えしますね。"],
+  [/[^。]*(使えな(い|ねー)|ありえ(ない|ねー)|あり得ない|うざ(い|っ)?|バカ|ばか|アホ|クソ|くそ)[^。]*[。！!]*/g, ""],
+  [/ちゃんとして[^。]*[。！!]*/g, "確認してもらえると嬉しいです。"],
+  [/は[？?]/g, ""],
   [/まだでしょうか/g, "その後いかがでしょうか"],
   [/至急対応/g, "もし可能でしたら早めに対応"],
   [/至急/g, "できれば早めに"],
@@ -210,6 +243,10 @@ const SOFT: Replacement[] = [
   [/(早く|はやく)して(よ|ね)?[。！!]*/g, "もし可能でしたら、早めに対応してもらえると助かります。"],
   [/急いで(ください|ね|よ)?[。！!]*/g, "急ぎで申し訳ないのですが、お願いできますか。"],
   [/やっ(とい|ておい)て(ください|ね|よ)?[。！!]*/g, "お願いしてもいいですか？"],
+  [/(マジ|まじ)で?/g, "本当に"],
+  [/すげ[ーぇえ]+(な|ね|よ)?/g, "すごいですね"],
+  [/終わった(の|ん)[？?]?/g, "終わったんですね！"],
+  [/じゃん/g, "ですね"],
   [/けど/g, "が"],
 ];
 
@@ -224,7 +261,9 @@ const apply = (text: string, rules: Replacement[]) => rules.reduce((t, [re, to])
 
 function rewrites(message: string, recipient: Recipient): CheckResult["rewrites"] {
   const body = apply(message.trim(), STRIP).trim();
-  const business = apply(body, BUSINESS);
+  const converted = apply(body, BUSINESS).trim();
+  // 暴言だけの文章は削ると何も残らないので、要点を確認する文に差し替える
+  const business = converted || "いただいた件について、いくつか確認させていただきたい点がございます。";
   const external = FORMAL_RECIPIENTS.includes(recipient);
   const opener = external ? "いつもお世話になっております。" : "お疲れ様です。";
   const closer = /お願い(いたします|申し上げます)。?$/.test(business)
@@ -236,7 +275,7 @@ function rewrites(message: string, recipient: Recipient): CheckResult["rewrites"
   return [
     {
       tone: "やわらか",
-      text: `お疲れさまです。お忙しいところすみません。\n${apply(body, SOFT)}\nご無理のない範囲で大丈夫ですので、よろしくお願いします。`,
+      text: `お疲れさまです。お忙しいところすみません。\n${apply(body, SOFT).trim() || "いただいた件で、少し確認させてほしいことがあります。"}\nご無理のない範囲で大丈夫ですので、よろしくお願いします。`,
     },
     { tone: "ビジネス標準", text: `${opener}\n${business}${closer}` },
     { tone: "簡潔", text: apply(business, TRIM) },
@@ -251,6 +290,17 @@ export function mockResult(req: CheckRequest): CheckResult {
   const hits = RULES.filter((r) => req.message.includes(r.phrase));
   let points = hits.reduce((sum, r) => sum + r.weight.base + (r.weight[req.recipient] ?? 0), 0);
 
+  const rudeHits: { phrase: string; reason: string; suggestion: string; base: number }[] = [];
+  for (const r of RUDE) {
+    const m = req.message.match(r.pattern);
+    // 「おせーよ」と「せーよ」のように、検出済みの箇所の一部なら二重に数えない
+    if (m && !rudeHits.some((h) => h.phrase.includes(m[0]) || m[0].includes(h.phrase))) {
+      rudeHits.push({ phrase: m[0], reason: r.reason, suggestion: r.suggestion, base: r.base });
+    }
+  }
+  points += rudeHits.reduce((sum, r) => sum + r.base + (r.base >= 2 ? RUDE_WEIGHT[req.recipient] : 0), 0);
+  const allHits = [...hits.map(({ phrase, reason, suggestion }) => ({ phrase, reason, suggestion })), ...rudeHits];
+
   const casual = CASUAL.test(req.message);
   if (casual && FORMAL_RECIPIENTS.includes(req.recipient)) points += 2;
   if (req.channel === "メール" && casual) points += 1;
@@ -262,16 +312,16 @@ export function mockResult(req: CheckRequest): CheckResult {
     score,
     label: `（デモ）${LABELS[score]}`,
     summary:
-      hits.length === 0 && !casual
-        ? `${req.recipient}宛てとして目立った危険表現は見つかりませんでした。(デモモード:ルールで簡易判定しています)`
-        : `${req.recipient}宛てだと、${hits.map((h) => `「${h.phrase}」`).join("")}${casual ? "くだけた表現" : ""}が引っかかります。(デモモード:ルールで簡易判定しています)`,
+      allHits.length === 0 && !casual
+        ? `${req.recipient}宛てとして目立った危険表現は見つかりませんでした。(デモモード:登録済みのルールだけで判定しているため、ルールに無い言い回しは見逃すことがあります)`
+        : `${req.recipient}宛てだと、${allHits.map((h) => `「${h.phrase}」`).join("")}${casual ? "くだけた表現" : ""}が引っかかります。(デモモード:ルールで簡易判定しています)`,
     reactions: pickPersonas(req.recipient).map((persona, i) => ({
       persona,
       reaction: pool[i % pool.length].reaction,
       inner_voice: pool[i % pool.length].inner,
       ignore_rate: Math.min(100, score * 15 + Math.floor(Math.random() * 20)),
     })),
-    risky_phrases: hits.map(({ phrase, reason, suggestion }) => ({ phrase, reason, suggestion })),
+    risky_phrases: allHits.map(({ phrase, reason, suggestion }) => ({ phrase, reason, suggestion })),
     rewrites: rewrites(req.message, req.recipient),
   };
 }
